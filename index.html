@@ -1,0 +1,34 @@
+<!DOCTYPE HTML>
+<header>
+	<script type="text/javascript" src="underscore.js"></script>
+	<script type="text/javascript" src="hex2bin.js"></script>
+	<script type="text/javascript" src="ant8051.js"></script>
+</header>
+<body>
+	<script type="text/javascript">
+
+
+        function showDataByText() {
+            var resultFile = document.getElementById("fileDemo").files[0];
+            if (resultFile) {
+                var reader = new FileReader();
+
+                reader.readAsText(resultFile,'gb2312');
+                reader.onload = function (e) {
+                    var urlData = this.result;
+                    // 首次测试需要显示内容，后面不用显示了。
+                    // document.getElementById("result").innerHTML += urlData;
+                    var antboard = new ant8051.core(urlData);
+                };
+            }
+        }
+	</script>
+	<input type="file" name="fileDemo" id="fileDemo" multep/>
+    <input type="button" value="readAsDataURL" id="readAsDataURL" onclick="showDataByURL();"/>
+    <input type="button" value="readAsBinaryString"  id="readAsBinaryString" onclick="showDataByBinaryString();"/>
+    <input type="button" value="readAsText"  id="readAsText" onclick="showDataByText();"/>
+    <div id="result">
+        
+    </div>
+
+</body>
