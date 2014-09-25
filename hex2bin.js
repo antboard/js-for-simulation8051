@@ -36,8 +36,8 @@ this.ant8051.romSize = this.ant8051.romSize | 64*1024;
 			//-- console.log(type);
 
 			// 计算校验和
-			value = value.replace("\n","")
-			if (len*2 + 10 !== value.length-1){ // the last null
+			value = value.replace("\r\n","")
+			if (len*2 + 10 !== value.length){ // the last null
 				alert("hex line short "+ value);
 				return false;
 			}
