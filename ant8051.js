@@ -3,6 +3,9 @@
 	good luck!
 	create by icecut@qq.com yichun jiang
 */
+/*
+* 乘法／除法／da 标志寄存器没处理
+*/
 
 this.ant8051 = this.ant8051 || {};
 // init ram size
@@ -52,6 +55,19 @@ this.ant8051.ramSize = this.ant8051.ramSize || 256;
 	}
 	p.setSpeed = function(curMhz){
 		p.speed = curMhz;
+	}
+	p.rangeCheckUnsigned = function(x){
+		if (x > 255) {
+			alert("biger");
+		};
+	}
+	p.rangeCheckSigned = function(x){
+		if (x > 127) {
+			alert("biger");
+		};
+		if (x < -128) {
+			alert("smaller");
+		};
 	}
 	/*
 	* R0-R7 一共4组，				占据00- 1f区域。
@@ -283,7 +299,7 @@ this.ant8051.ramSize = this.ant8051.ramSize || 256;
 				return;
 			};
 		}
-		alert(times);
+		alert("times = "times);
 	};
 
 	// 00
@@ -311,10 +327,14 @@ this.ant8051.ramSize = this.ant8051.ramSize || 256;
 		p.PC++;
 		if (d0 === 0x04) {
 			p.ram[p.A]++;
+			p.rangeCheckUnsigned(p.ram[p.A]);
+			return;
 		};
+
 		if ((d0 & 0xf8) === 0x08) {
 			var idx = d0 & 0x07;
 			p.ram[8*p.regGroup+idx]++;
+			p.rangeCheckUnsigned(p.ram[8*p.regGroup+idx]);
 			return;
 		};
 
@@ -322,6 +342,7 @@ this.ant8051.ramSize = this.ant8051.ramSize || 256;
 			var idx = d0 & 1;
 			var addr = p.ram[8*p.regGroup+idx];
 			p.ram[addr]++;
+			p.rangeCheckUnsigned(p.ram[addr]);
 			return;
 		};
 
@@ -329,6 +350,7 @@ this.ant8051.ramSize = this.ant8051.ramSize || 256;
 
 		if (d0 === 0x05) {
 			p.ram[d1]++;
+			p.rangeCheckUnsigned(p.ram[d1]);
 			return; 
 		};
 	};
@@ -343,7 +365,7 @@ this.ant8051.ramSize = this.ant8051.ramSize || 256;
 		var bit = 1 << (d1 % 8);
 		
 		if ((p.ram[0x20+addr] & bit) === 1) {
-			p.ram[0x20+addr] &= ~bit；
+			p.ram[0x20+addr] &= ~bit;
 			var rel = d2;
 			if (d2 > 127) {
 				rel -= 256;
@@ -388,10 +410,14 @@ this.ant8051.ramSize = this.ant8051.ramSize || 256;
 		p.PC++;
 		if (d0 === 0x14) {
 			p.ram[p.A]--;
+			p.rangeCheckSigned(p.ram[p.A]);
+			return;
 		};
+
 		if ((d0 & 0xf8) === 0x18) {
 			var idx = d0 & 0x07;
 			p.ram[8*p.regGroup+idx]--;
+			p.rangeCheckSigned(p.ram[8*p.regGroup+idx]);
 			return;
 		};
 
@@ -399,6 +425,7 @@ this.ant8051.ramSize = this.ant8051.ramSize || 256;
 			var idx = d0 & 1;
 			var addr = p.ram[8*p.regGroup+idx];
 			p.ram[addr]--;
+			p.rangeCheckSigned(p.ram[addr]);
 			return;
 		};
 
@@ -406,6 +433,7 @@ this.ant8051.ramSize = this.ant8051.ramSize || 256;
 
 		if (d0 === 0x15) {
 			p.ram[d1]--;
+			p.rangeCheckSigned(p.ram[d1]);
 			return; 
 		};		
 	}
@@ -444,34 +472,70 @@ this.ant8051.ramSize = this.ant8051.ramSize || 256;
 		if (b7) {
 			p.ram[p.A] |= 1;
 		};
+		p.rangeCheckUnsigned(p.ram[p.A]);
+	}
+
+	p.addStatus = function(x,y){
+		var cy = 0;
+		var ov = 0;
+		var bit7_s = 0, bit7_d = 0;
+		var bit6_s = 0,	bit6_d = 0;
+
+		bit7_s = x & 0x80;
+		bit6_s = x & 0x40;
+		bit7_d = y & 0x80;
+		bit6_d = y & 0x40;
+		cy = bit7_s && bit7_d;// 两个bit都是1才能进位
+		ov = bit6_s && bit6_d;// 两个bit都是1才能进位
+		ov = ov ^ cy;
+		if (cy) {
+			p.ram[p.PSW] |= p.PSW_C	;
+		}else{
+			p.ram[p.PSW] &= ~p.PSW_C;
+		}
+
+		if (ov) {
+			p.ram[p.PSW] |= p.PSW_OV;
+		}else{
+			p.ram[p.PSW] &= ~p.PSW_OV;
+		}
+		
 	}
 	// 24..f
 	p.ADD = function(){
 		var d0 = p.rom[p.PC];
 		var d1 = p.rom[p.PC + 1];
 		p.PC++;
-
+		
 		if ((d0 & 0xf8) === 0x28) {
 			var idx = d0 & 0x07;
+			p.addStatus(p.ram[p.A], p.ram[8*p.regGroup+idx]);
 			p.ram[p.A] = p.ram[p.A] + p.ram[8*p.regGroup+idx];
+			p.rangeCheckUnsigned(p.ram[p.A]);
 			return;
 		};
 
 		if ((d0 & 0xfe) === 0x26) {
 			var idx = d0 & 1;
 			var addr = p.ram[8*p.regGroup+idx];
+			p.addStatus(p.ram[p.A], p.ram[addr]);
 			p.ram[p.A] = p.ram[p.A] + p.ram[addr];
+			p.rangeCheckUnsigned(p.ram[p.A]);
 			return;
 		};
 
 		p.PC++;
 		if (d0 === 0x24) {
+			p.addStatus(p.ram[p.A], d1);
 			p.ram[p.A] = p.ram[p.A] + d1;
+			p.rangeCheckUnsigned(p.ram[p.A]);
 			return;
 		};
 
 		if (d0 === 0x25) {
+			p.addStatus(p.ram[p.A], p.ram[d1]);
 			p.ram[p.A] = p.ram[p.A] + p.ram[d1];
+			p.rangeCheckUnsigned(p.ram[p.A]);
 			return;
 		};
 	}
@@ -515,6 +579,7 @@ this.ant8051.ramSize = this.ant8051.ramSize || 256;
 		}else{
 			p.ram[p.PSW] &= ~0x80;
 		}
+		p.rangeCheckUnsigned(p.ram[p.A]);
 	}
 	// 34..f
 	p.ADDC = function(){
@@ -529,25 +594,33 @@ this.ant8051.ramSize = this.ant8051.ramSize || 256;
 
 		if ((d0 & 0xf8) === 0x38) {
 			var idx = d0 & 0x07;
+			p.addStatus(p.ram[p.A], p.ram[8*p.regGroup+idx] + c);
 			p.ram[p.A] = p.ram[p.A] + p.ram[8*p.regGroup+idx] + c;
+			p.rangeCheckUnsigned(p.ram[p.A]);
 			return;
 		};
 
 		if ((d0 & 0xfe) === 0x36) {
 			var idx = d0 & 1;
 			var addr = p.ram[8*p.regGroup+idx];
+			p.addStatus(p.ram[p.A], p.ram[addr] + c);
 			p.ram[p.A] = p.ram[p.A] + p.ram[addr] + c;
+			p.rangeCheckUnsigned(p.ram[p.A]);
 			return;
 		};
 
 		p.PC++;
 		if (d0 === 0x34) {
+			p.addStatus(p.ram[p.A], d1 + c);
 			p.ram[p.A] = p.ram[p.A] + d1 + c;
+			p.rangeCheckUnsigned(p.ram[p.A]);
 			return;
 		};
 
 		if (d0 === 0x35) {
+			p.addStatus(p.ram[p.A], p.ram[d1] + c);
 			p.ram[p.A] = p.ram[p.A] + p.ram[d1] + c;
+			p.rangeCheckUnsigned(p.ram[p.A]);
 			return;
 		};
 	}
@@ -865,6 +938,25 @@ this.ant8051.ramSize = this.ant8051.ramSize || 256;
 		p.ram[p.A] = p.rom[offset];
 		p.PC++;
 	};
+	p.subbStatus = function(x, c, y){
+		if (x !== 0) {x -= c};
+		var cy = (x < y) ? 1 : 0;
+		var o1 = x & 0x7f;
+		var o2 = y & 0x7f;
+		var ov = (x - y) & 0x80;
+		ov = ov ^ cy;
+		if (cy) {
+			p.ram[p.PSW] |= p.PSW_C	;
+		}else{
+			p.ram[p.PSW] &= ~p.PSW_C;
+		}
+
+		if (ov) {
+			p.ram[p.PSW] |= p.PSW_OV;
+		}else{
+			p.ram[p.PSW] &= ~p.PSW_OV;
+		}
+	}
 	// 94..f
 	p.SUBB = function(){
 		var d0 = p.rom[p.PC];
@@ -874,26 +966,34 @@ this.ant8051.ramSize = this.ant8051.ramSize || 256;
 		var c = (p.ram[p.PSW] & 0x80) ? 1 : 0;
 		if ((d0 & 0xf8) === 0x98) {
 			var idx = d0 & 0x07;
+			p.subbStatus(p.ram[p.A], c, p.ram[8*p.regGroup+idx]);
 			p.ram[p.A] = p.ram[p.A] - c - p.ram[8*p.regGroup+idx];
+			p.rangeCheckSigned(p.ram[p.A]);
 			return;
 		};
 
 		if ((d0 & 0xfe) === 0x96) {
 			var idx = d0 & 1;
 			var addr = p.ram[8*p.regGroup+idx];
+			p.subbStatus(p.ram[p.A], c, p.ram[addr]);
 			p.ram[p.A] = p.ram[p.A] - c - p.ram[addr];
+			p.rangeCheckSigned(p.ram[p.A]);
 			return;
 		};
 		
 		p.PC++;
 
 		if (d0 === 0x94) {
+			p.subbStatus(p.ram[p.A], c, d1);
 			p.ram[p.A] = p.ram[p.A] - c - d1;
+			p.rangeCheckSigned(p.ram[p.A]);
 			return;
 		};
 
 		if (d0 === 0x95) {
+			p.subbStatus(p.ram[p.A], c, p.ram[d1]);
 			p.ram[p.A] = p.ram[p.A] - c - p.ram[d1];
+			p.rangeCheckSigned(p.ram[p.A]);
 			return;
 		};
 	}
@@ -1290,7 +1390,7 @@ this.ant8051.ramSize = this.ant8051.ramSize || 256;
 
 		var idx = d0 & 0x07;
 		p.ram[8*p.regGroup+idx]--;
-		if (p.ram[8*p.regGroup+idx] == 0) {
+		if (p.ram[8*p.regGroup+idx]) {
 			p.PC += d1;
 		};
 		return;
